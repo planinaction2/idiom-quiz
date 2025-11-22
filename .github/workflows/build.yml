@@ -3,22 +3,27 @@ name: Build APK
 on:
   push:
     branches: [ main ]
+  workflow_dispatch: # Adds a manual "Run Workflow" button
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
     
+    steps:
+    # Updated to v4 (Latest)
+    - uses: actions/checkout@v4
+    
+    # Updated to v5 (Latest)
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flet
+        pip install flet openpyxl
+        # Note: removed pandas to speed up build, as discussed
         
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
@@ -29,8 +34,9 @@ jobs:
       run: |
         flet build apk --verbose
         
+    # Updated to v4 (Fixes your error)
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: idiom-quiz-apk
         path: build/app/outputs/flutter-apk/app-release.apk
