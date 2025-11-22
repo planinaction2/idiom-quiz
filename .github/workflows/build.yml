@@ -1,0 +1,36 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flet
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        
+    - name: Build APK
+      run: |
+        flet build apk --verbose
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: idiom-quiz-apk
+        path: build/app/outputs/flutter-apk/app-release.apk
