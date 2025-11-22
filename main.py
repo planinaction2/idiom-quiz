@@ -80,17 +80,17 @@ class QuizApp:
         self.opts_column = ft.Column(spacing=10)
 
         # Bottom Bar Buttons
-        self.btn_prev = self._make_bottom_btn("Previous", ft.Icons.ARROW_BACK, self.prev_q, visible=True)
-        self.btn_next = self._make_bottom_btn("Next", ft.Icons.ARROW_FORWARD, self.next_q, visible=True)
+        self.btn_prev = self._make_bottom_btn("Previous", ft.Icons.ARROW_BACK, self.prev_q, visible=True, bgcolor=ft.Colors.BLUE)
+        self.btn_next = self._make_bottom_btn("Next", ft.Icons.ARROW_FORWARD, self.next_q, visible=True, bgcolor=ft.Colors.BLUE)
 
-        self.btn_mark = self._make_bottom_btn("Mark Review", ft.Icons.FLAG_OUTLINED, self.toggle_flag, visible=True)
-        self.btn_check = self._make_bottom_btn("Check Answer", ft.Icons.CHECK_CIRCLE_OUTLINE, self.submit_current, visible=True)
-        self.btn_finish = self._make_bottom_btn("Finish Quiz", ft.Icons.DONE_ALL, self.submit_all, visible=True)
+        self.btn_mark = self._make_bottom_btn("Mark Review", ft.Icons.FLAG_OUTLINED, self.toggle_flag, visible=True, bgcolor=ft.Colors.ORANGE)
+        self.btn_check = self._make_bottom_btn("Check Answer", ft.Icons.CHECK_CIRCLE_OUTLINE, self.submit_current, visible=True, bgcolor=ft.Colors.GREEN)
+        self.btn_finish = self._make_bottom_btn("Finish Quiz", ft.Icons.DONE_ALL, self.submit_all, visible=True, bgcolor=ft.Colors.RED)
         
-        self.btn_retry = self._make_bottom_btn("Retry", ft.Icons.REFRESH, self.handle_retry, visible=False)
-        self.btn_new = self._make_bottom_btn("New File", ft.Icons.UPLOAD_FILE, self.handle_new, visible=False)
-        # FIX: Updated to use page.window.close() for newer Flet versions
-        self.btn_exit = self._make_bottom_btn("Exit", ft.Icons.EXIT_TO_APP, lambda e: self.page.window.close(), visible=False)
+        self.btn_retry = self._make_bottom_btn("Retry", ft.Icons.REFRESH, self.handle_retry, visible=False, bgcolor=ft.Colors.RED)
+        self.btn_new = self._make_bottom_btn("New File", ft.Icons.UPLOAD_FILE, self.handle_new, visible=False, bgcolor=ft.Colors.PURPLE)
+        # Updated to use page.window.close() for newer Flet versions
+        self.btn_exit = self._make_bottom_btn("Exit", ft.Icons.EXIT_TO_APP, lambda e: self.page.window.close(), visible=False, bgcolor=ft.Colors.GREY)
 
         self.controls_running = [self.btn_mark, self.btn_check, self.btn_finish]
         self.controls_finished = [self.btn_retry, self.btn_new, self.btn_exit]
@@ -104,16 +104,25 @@ class QuizApp:
         mode = "dark" if self.page.theme_mode == ft.ThemeMode.DARK else "light"
         return THEME_COLORS[mode].get(key, ft.Colors.BLACK)
 
-    def _make_bottom_btn(self, text, icon, cmd, visible=False):
+    def _make_bottom_btn(self, text, icon, cmd, visible=False, bgcolor=None):
+        # Centralized button factory that allows optional background color
+        style = ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=10),
+            padding=15,
+        )
+        if bgcolor is not None:
+            style = ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=10),
+                padding=15,
+                bgcolor=bgcolor,
+                color=ft.Colors.WHITE
+            )
         return ft.ElevatedButton(
             text=text,
             icon=icon,
             on_click=cmd,
             height=45,
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=10),
-                padding=15,
-            ),
+            style=style,
             visible=visible
         )
     
@@ -226,7 +235,10 @@ class QuizApp:
                 ft.Container(height=20),
                 self.opts_column,
                 ft.Container(height=20),
-                self.feedback_container
+                ft.Container(
+            expand=True,
+            content=self.feedback_container
+        )
             ]
         )
 
@@ -440,7 +452,7 @@ class QuizApp:
                 if opt == correct_letter:
                     marker = "✅ ➡"
                 elif opt == committed_ans:
-                    marker = "❌ ➡"
+                    marker = "➡"
                 full_text += f"{opt}: {idiom}\n   {marker} {meaning}\n\n"
             
             self.lbl_feedback.value = full_text
@@ -460,26 +472,39 @@ class QuizApp:
         self.temp_selection = char
         self.load_question(self.current)
 
-    def submit_current(self, e):
+    def submit_current(self, e=None, auto=False):
+        # Prevent submission if quiz already finished or question already answered
         if self.submitted or self.selected_answers[self.current]:
             return
-        
-        selection_to_commit = self.temp_selection
-        
+
+        # Decide whether this is an automatic submit (timeout) or a manual one
+        # auto=True explicitly indicates automatic (timeout) submission.
+        # If auto is True, do NOT commit temp_selection.
+        if auto:
+            selection_to_commit = None
+        else:
+            # Manual submit (user clicked "Check Answer")
+            selection_to_commit = self.temp_selection
+
+        # If user tried to submit manually without selecting, show snackbar and stop.
         if not selection_to_commit:
-             if e is not None:
-                 self.page.open(ft.SnackBar(ft.Text("Please select an option first.")))
-                 return
-             else:
-                 pass 
-        
+            if not auto:
+                # manual empty submit -> show message
+                self.page.open(ft.SnackBar(ft.Text("Please select an option first.")))
+                return
+            # else: auto submit with no answer, continue
+
+        # Commit the answer (could be None for auto-timeout = not answered)
         self.selected_answers[self.current] = selection_to_commit
-        
+
         if self.timer_mode == "per_question":
+            # stop this question's timer
             self.timer_running = False
-            
+
+        # Refresh view to show feedback (or "Not Answered." for None)
         self.load_question(self.current)
-        
+
+        # In per-question mode, move to next question after a short pause so user sees feedback
         if self.timer_mode == "per_question":
             def delayed_move():
                 time.sleep(1.5)
@@ -626,9 +651,10 @@ class QuizApp:
                         self.page.run_task(finish)
                         break
                     elif self.timer_mode == "per_question":
+                        # STOP: automatic per-question submit — use auto=True so temp_selection isn't committed
                         self.timer_running = False
                         async def auto_submit():
-                            self.submit_current(None) 
+                            self.submit_current(None, auto=True)
                         self.page.run_task(auto_submit)
                         break
                         
@@ -663,7 +689,7 @@ class QuizApp:
                     opts.append({"idiom": r[idiom_col], "meaning": r[meaning_col], "is_correct": False})
                 rng.shuffle(opts)
                 
-                entry = {"Question": f"What is the idiom for:\n\n'{target[meaning_col]}'?", "Correct Answer": ""}
+                entry = {"Question": f"{target[meaning_col]}", "Correct Answer": ""}
                 for idx, char in enumerate(["A", "B", "C", "D"]):
                     entry[f"Option {char}"] = opts[idx]["idiom"]
                     entry[f"Meaning {char}"] = opts[idx]["meaning"]
