@@ -324,18 +324,26 @@ class QuizApp:
         self.update_nav_colors()
 
     # --- GAME LOGIC ---
-    def on_file_picked(self, e: ft.FilePickerResultEvent):
-        if not e.files: return
-        file_path = e.files[0].path
-        if not file_path:
-             self.page.open(ft.SnackBar(ft.Text("Error: PC cannot read phone file path. Build APK to test.")))
-             return
+    def on_file_picked(self, e):
+        if not e.files:
+            return
+
+        file = e.files[0]
 
         try:
-            self.raw_df = pd.read_csv(file_path) if file_path.endswith(".csv") else pd.read_excel(file_path)
+            if file.name.endswith(".csv"):
+                self.raw_df = pd.read_csv(io.BytesIO(file.bytes))
+            else:
+                self.raw_df = pd.read_excel(io.BytesIO(file.bytes))
+
+        # Normalize column names
+            self.raw_df.columns = self.raw_df.columns.str.strip()
+
             self.setup_game()
+
         except Exception as ex:
             self.page.open(ft.SnackBar(ft.Text(f"Error loading file: {ex}")))
+            self.page.update()
 
     def setup_game(self):
         try:
@@ -701,3 +709,4 @@ def main(page: ft.Page):
     QuizApp(page)
 
 ft.app(target=main)
+
