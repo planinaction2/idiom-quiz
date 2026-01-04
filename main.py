@@ -4,6 +4,7 @@ import random
 import threading
 import time
 import asyncio
+import io 
 
 # --- CONFIGURATION & COLORS ---
 THEME_COLORS = {
@@ -709,4 +710,5 @@ def main(page: ft.Page):
     QuizApp(page)
 
 ft.app(target=main)
+
 
